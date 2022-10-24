@@ -14,7 +14,7 @@ CREATE TABLE users (
   -- username that's a 100 char varchar and unique
   username VARCHAR(100) unique,
   -- password that's a 200 char varchar
-  password VARCHAR(200),
+  password VARCHAR(200)
 );
 CREATE TABLE cart (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
