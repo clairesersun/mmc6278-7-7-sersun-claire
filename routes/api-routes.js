@@ -93,9 +93,9 @@ router.post('/user', async (req, res) => {
   try {
     const {username, password} = req.body
     // if the username or password is not provided, return a 400 status
-    if (!username || !password) return res.status(400).send('missing username or password')
+    if (!(username && password)) return res.status(400).send('missing username or password')
     // hash the password using bcrypt.hash and use 10 salt rounds
-    const hash = bcrypt.hash(password, 10)
+    const hash = await bcrypt.hash(password, 10)
     // then insert the username and hashed password into the users table
     await db.query(
       `INSERT INTO users (username, password) VALUES (?, ?)`,
@@ -109,33 +109,40 @@ router.post('/user', async (req, res) => {
       // return a 409 status code (the user exists already)
         return res.status(409).send('the user exists already')
         // for any other error, return a 500 status
-      res.status(500)
+      res.status(500).send('Error creating user: ' + err.message || err.sqlMessage)
     }
 })
 
 // This route will log the user in and create the session
 router.post('/login', async (req, res) => {
+  try { 
   const {username, password} = req.body
   // if the username or password is not provided, return a 400 status
-  if (!username || !password) return res.status(400).send('missing username or password')
+  if (!(username && password)) return res.status(400).send('missing username or password')
+  
   // Query the database by the username for the user
   const [[user]] = await db.query(
-    `SELECT * users WHERE username=? `,
-    username
+    `SELECT * FROM users WHERE username=?`,
+    [username]
   )
+  
   // If no user is found, return a 400 status code
-  if (!user) return res.status(400)
+  if (!user) return res.status(400).send('user not found')
+  
   // If the user is found, use bcrypt.compare to compare the password to the hash
-  const isCorrectPassword = await bcrypt.compare(password, user.password)
-  // If the password is wrong, return a 400 status code
-  if (!isCorrectPassword) return res.status(400)
-  // If the password matches, set req.session.loggedIn to true
-  req.session.loggedIn = true
-  // set req.session.userId to the user's id
-  req.session.userId = users.id
-  // call req.session.save and in the callback redirect to /
-  req.session.save(() => res.redirect('/'))
-})
+    const isCorrectPassword = await bcrypt.compare(password, user.password)
+    // If the password is wrong, return a 400 status code
+    if (!isCorrectPassword) return res.status(400).send('incorrect login')
+    
+    // If the password matches, set req.session.loggedIn to true
+    req.session.loggedIn = true
+    // set req.session.userId to the user's id
+    req.session.userId = user.id
+    // call req.session.save and in the callback redirect to /
+    req.session.save(() => res.redirect('/'))
+  } catch(err) {
+    res.status(500).send('Error logging in: ' + err.message || err.sqlMessage)
+}})
 
 router.get('/logout', async (req, res) => {
   // call req.session.destroy and in the callback redirect to /
